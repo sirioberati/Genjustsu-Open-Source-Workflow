@@ -177,6 +177,8 @@ def submit_hd(folder):
     if (hd/'response.json').exists() or (hd/'fal-submission-attempt.json').exists():
         raise ValueError('HD already attempted. Resume or check fal request history.')
     shutil.copy2(folder/'upload.mp4', hd/'upload.mp4')
+    if (folder/'replacement-scope.json').exists():
+        shutil.copy2(folder/'replacement-scope.json',hd/'replacement-scope.json')
     payload = dict(draft_id=metadata['draft_id'], resolution='1080p', output_format='mp4')
     (hd/'request.json').write_text(json.dumps(payload, indent=2))
     return queue(hd, payload, COMPLETE, 'response.json', dict(provider='fal', model=COMPLETE, mode='draft_complete', is_draft=False))

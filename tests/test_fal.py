@@ -89,6 +89,7 @@ class FalTests(unittest.TestCase):
 
     def test_hd_uses_actual_draft_id_and_survives_default_provider_change(self):
         for name in ['upload.mp4','final-preview.mp4']:(self.folder/name).write_bytes(b'original')
+        (self.folder/'replacement-scope.json').write_text('{"start_seconds":7}')
         metadata = {'provider':'fal','is_draft':True,'request_id':'queue-id','draft_id':'actual-draft-id','draft_expires_at':(datetime.now(timezone.utc)+timedelta(days=1)).isoformat()}
         (self.folder/'generation.json').write_text(json.dumps(metadata))
         with patch('fal_bridge.credential', return_value='fake'), patch('fal_bridge.requests.post', return_value=self.queue_reply()) as post:
@@ -97,6 +98,7 @@ class FalTests(unittest.TestCase):
             self.assertTrue(post.call_args.args[0].endswith('/us/draft/complete'))
             self.assertEqual((self.folder/'hd/upload.mp4').read_bytes(), b'original')
             self.assertEqual(seedance_bridge.job_provider(self.folder/'hd'), 'fal')
+            self.assertEqual(json.loads((self.folder/'hd/replacement-scope.json').read_text())['start_seconds'],7)
             with self.assertRaises(ValueError):seedance_bridge.submit_hd(self.folder)
         metadata['draft_expires_at']=(datetime.now(timezone.utc)-timedelta(days=1)).isoformat()
         (self.folder/'generation.json').write_text(json.dumps(metadata))
