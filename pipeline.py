@@ -87,10 +87,37 @@ def grayscale(src,dst,inferno=False):
     if out is None:raise ValueError('Empty depth video')
     finish(out,s)
 
+def align_blank_flash_mask(original, mask_files, directory, counts):
+    """Recover one omitted mask only on a visually empty, near-white flash."""
+    if counts[0]!=counts[1] or counts[0]-counts[2]!=1:return mask_files
+    indices=[int(p.stem.split('_')[-1]) for p in mask_files]
+    missing=set(range(counts[0]))-set(indices)
+    if len(missing)!=1 or len(set(indices))!=len(indices) or any(i<0 or i>=counts[0] for i in indices):return mask_files
+    index=missing.pop()
+    frame=next(a for i,a in enumerate(frames(original)) if i==index)
+    # Allow black letterboxing. A visible subject or nonuniform transition fails closed.
+    active=np.flatnonzero(np.any(frame>24,axis=(1,2)))
+    if len(active)<8:return mask_files
+    content=frame[active[0]+2:active[-1]-1]
+    if not content.size or content.min()<230 or np.mean(content>=240)<.998:return mask_files
+    repair=Path(directory)/'empty-flash-masks';repair.mkdir(exist_ok=True)
+    target=repair/f'mask_{index:05d}.png'
+    with Image.open(mask_files[0]) as reference:Image.new('L',reference.size,0).save(target)
+    (Path(directory)/'mask-alignment-repair.json').write_text(json.dumps({
+        'method':'empty mask at near-white flash; existing indices preserved',
+        'frame':index,'source_frames':counts[0],'sam_masks':counts[2],
+        'review_required':True},indent=2))
+    # Existing approval cannot survive an artifact repair.
+    (Path(directory)/'mask-review.json').unlink(missing_ok=True)
+    return sorted(mask_files+[target],key=lambda p:int(p.stem.split('_')[-1]))
+
 def composite(original,depth,seg,directory,audio_source=None):
     raw=Path(seg).is_dir()
     mask_files=sorted(Path(seg).glob('mask_*.png')) if raw else []
     counts=[sum(1 for _ in frames(p)) for p in [original,depth]]+[len(mask_files) if raw else sum(1 for _ in frames(seg))]
+    if raw and len(set(counts))!=1:
+        mask_files=align_blank_flash_mask(original,mask_files,directory,counts)
+        counts[2]=len(mask_files)
     if len(set(counts))!=1:raise ValueError(f'Frame alignment failed (original/depth/SAM): {counts}. No misaligned export produced.')
     if raw and [int(p.stem.split('_')[-1]) for p in mask_files]!=list(range(counts[0])):raise ValueError('Missing or shifted frame indices in raw masks.')
     outs={};area=0

@@ -37,3 +37,34 @@ class MediaTests(unittest.TestCase):
     for i in range(2):put(c,s,np.zeros((64,64,3),dtype=np.uint8),i)
     finish(c,s)
    with self.assertRaisesRegex(ValueError,'Frame alignment'):composite(p/'original.mp4',p/'depth.mp4',p/'masks',p)
+
+ def test_missing_mask_at_white_flash_preserves_frame_indices(self):
+  from PIL import Image
+  with tempfile.TemporaryDirectory() as directory:
+   p=Path(directory);masks=p/'masks';masks.mkdir()
+   for name in ['original','depth']:
+    c,s=writer(p/(name+'.mp4'),64,64)
+    for i in range(3):
+     a=np.full((64,64,3),70,dtype=np.uint8)
+     if i==1:a[:]=0;a[16:48]=250
+     put(c,s,a,i)
+    finish(c,s)
+   for i in [0,2]:Image.fromarray(np.full((64,64),255,dtype=np.uint8)).save(masks/f'mask_{i:05d}.png')
+   self.assertEqual(composite(p/'original.mp4',p/'depth.mp4',masks,p),3)
+   from pipeline import frames
+   exported=list(frames(p/'composite-silent.mp4'))
+   self.assertEqual(len(exported),3)
+   self.assertGreater(exported[1][32,32,0],240)
+   self.assertTrue((p/'mask-alignment-repair.json').exists())
+
+ def test_missing_mask_on_visible_content_still_refused(self):
+  from PIL import Image
+  with tempfile.TemporaryDirectory() as directory:
+   p=Path(directory);masks=p/'masks';masks.mkdir()
+   for name in ['original','depth']:
+    c,s=writer(p/(name+'.mp4'),64,64)
+    for i in range(2):put(c,s,np.full((64,64,3),80,dtype=np.uint8),i)
+    finish(c,s)
+   Image.fromarray(np.full((64,64),255,dtype=np.uint8)).save(masks/'mask_00000.png')
+   with self.assertRaisesRegex(ValueError,'Frame alignment'):composite(p/'original.mp4',p/'depth.mp4',masks,p)
+   self.assertFalse((p/'composite-silent.mp4').exists())

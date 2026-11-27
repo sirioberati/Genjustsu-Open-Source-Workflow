@@ -13,3 +13,9 @@
 - Restart: Seedance and HD result retrieval resume from saved responses. Earlier preparation failures require inspecting saved Replicate predictions. The local UI is not a durable distributed worker queue.
 - UI fonts: Google Fonts is used, with system fallbacks if offline. Companion artwork is bundled under `static/companions`.
 - Lost pending status: use `workflow.py resume JOB` (or `--hd`), not another submit. Completed outputs remain in `runs`.
+
+## A SAM mask is missing at a white flash
+
+SAM may omit a PNG for an empty detection while preserving subsequent frame indices. The compositor can recover exactly one omitted mask only when source and depth counts agree, every other mask index is present, and the source frame is a near-white flash with optional black letterboxing. It inserts an empty mask at that index, leaves the raw files untouched, records `mask-alignment-repair.json`, and clears review approval. All source/depth frames remain in the export.
+
+Other count mismatches, missing masks on visible content, duplicate indices and shifted indices still stop export. The recovery is a narrow input check, not visual approval. Review the complete prepared clip, especially scene cuts. If depth segmentation includes background or misses people, use the original-RGB SAM repair within the authorized processing scope. Do not resubmit paid depth or audio jobs merely to repair a missing mask.
