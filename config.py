@@ -24,3 +24,10 @@ def credential(name):
     value=setting(name)
     if not value:raise ValueError(f'Set {name} in this project’s .env file.')
     return value
+
+
+def generation_provider():
+    provider=setting('GENERATION_PROVIDER','enhancor')
+    if provider not in ['enhancor','fal']:
+        raise ValueError('GENERATION_PROVIDER must be enhancor or fal.')
+    return provider

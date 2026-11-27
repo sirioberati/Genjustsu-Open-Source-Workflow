@@ -38,8 +38,9 @@ def get(ident:str):
         raise HTTPException(404)
     return jobs[ident]
 @app.post('/jobs/{ident}/seedance')
-def seedance(ident:str,prompt:str=Form(...),sirio:UploadFile=File(...),tein:UploadFile|None=File(None)):
+def seedance(ident:str,prompt:str=Form(...),sirio:UploadFile=File(...),tein:UploadFile|None=File(None),generation_provider:str|None=Form(None)):
     if len(ident)!=32 or not all(c in '0123456789abcdef' for c in ident):raise HTTPException(404)
+    if generation_provider not in [None,'enhancor','fal']:raise HTTPException(400,'Unknown generation provider')
     folder=RUNS/ident
     if not (folder/'audio-manifest.json').exists():raise HTTPException(400,'Audio separation must complete first.')
     from mask_review import require_approved
@@ -56,7 +57,7 @@ def seedance(ident:str,prompt:str=Form(...),sirio:UploadFile=File(...),tein:Uplo
         with path.open('wb') as f:shutil.copyfileobj(upload.file,f)
         paths.append(path)
     from seedance_bridge import submit
-    try:request_id=submit(folder,prompt,*paths)
+    try:request_id=submit(folder,prompt,*paths,provider=generation_provider)
     except Exception as e:raise HTTPException(502,str(e))
     jobs[ident]={'id':ident,'state':'running','status':'Seedance rendering: '+request_id}
     def collect():
@@ -115,7 +116,7 @@ def create_hd(ident:str):
         from seedance_bridge import submit_hd,wait_and_finish
         try:
             request_id=submit_hd(folder)
-            hd_jobs[ident].update(request_id=request_id,status='Generating 1080p through Enhancor');save()
+            hd_jobs[ident].update(request_id=request_id,status='Generating approved draft in 1080p');save()
             wait_and_finish(hd,request_id,lambda s:hd_jobs[ident].update(status=s))
             hd_jobs[ident].update(state='done',status='1080p ready · original source audio restored')
         except Exception as e:hd_jobs[ident].update(state='error',status=str(e))
@@ -139,13 +140,13 @@ app.mount('/static',StaticFiles(directory=ROOT/'static'),name='static')
 @app.on_event('startup')
 def resume_saved_generations():
     """Resume collection only: never requeue a paid prediction on restart."""
-    from seedance_bridge import wait_and_finish
+    from seedance_bridge import wait_and_finish,saved_request_id
     for root in RUNS.iterdir():
         if not root.is_dir() or len(root.name)!=32:continue
         for folder,response_file,registry in [(root,'seedance-response.json',jobs),(root/'hd','response.json',hd_jobs)]:
             response=folder/response_file
             if not response.exists() or (folder/'final-preview.mp4').exists():continue
-            try:request_id=json.loads(response.read_text()).get('requestId')
+            try:request_id=saved_request_id(folder,response_file)
             except (ValueError,OSError):continue
             if not request_id:continue
             registry[root.name]={'id':root.name,'state':'running','status':'Resuming saved request '+request_id}
@@ -160,3 +161,11 @@ def resume_saved_generations():
 @app.get('/health')
 def health():
     return {'status':'ok','service':'TEIN Video Workflow'}
+
+
+@app.get('/generation-config')
+def generation_config():
+    from config import generation_provider,setting
+    provider=generation_provider()
+    key='FAL_KEY' if provider=='fal' else 'ENHANCOR_API_KEY'
+    return {'provider':provider,'key_configured':bool(setting(key).strip())}

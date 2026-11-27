@@ -8,7 +8,7 @@ c=sub.add_parser('prepare');c.add_argument('video');c.add_argument('--subject',d
 for command in ['status','repair-rgb','resume','hd','review','submit']:
  c=sub.add_parser(command);c.add_argument('job')
  if command=='review':c.add_argument('--approve',action='store_true');c.add_argument('--fingerprint',required=True);c.add_argument('--note',required=True)
- if command=='submit':c.add_argument('--prompt-file',required=True);c.add_argument('--reference',required=True);c.add_argument('--second-reference')
+ if command=='submit':c.add_argument('--prompt-file',required=True);c.add_argument('--reference',required=True);c.add_argument('--second-reference');c.add_argument('--generation-provider',choices=['enhancor','fal'])
  if command=='resume':c.add_argument('--hd',action='store_true')
 sub.choices['prepare'].add_argument('--mode',choices=['depth','face_mesh','depth_mesh'],default='depth')
 a=p.parse_args()
@@ -53,15 +53,15 @@ elif a.command=='repair-rgb':
  meta['mask_method']='SAM 3 on original RGB, preserving depth colors';(folder/'manifest.json').write_text(json.dumps(meta,indent=2))
  print('Repaired. Review the entire clip again; approval cleared.')
 else:
- from seedance_bridge import submit,submit_hd,wait_and_finish
+ from seedance_bridge import submit,submit_hd,wait_and_finish,saved_request_id
  if a.command=='submit':
-  request=submit(folder,Path(a.prompt_file).read_text(),a.reference,a.second_reference)
+  request=submit(folder,Path(a.prompt_file).read_text(),a.reference,a.second_reference,provider=a.generation_provider)
  elif a.command=='hd':
   request=submit_hd(folder);folder=folder/'hd'
  else:
   folder=folder/'hd' if a.hd else folder
   saved=folder/('response.json' if a.hd else 'seedance-response.json')
-  request=json.loads(saved.read_text())['requestId']
+  request=saved_request_id(folder,saved.name)
  wait_and_finish(folder,request)
  (folder/'status.json').write_text(json.dumps({'id':a.job,'state':'done','status':'Final preview ready · original source audio','final_url':f'/runs/{a.job}/'+('hd/' if folder.name=='hd' else '')+'final-preview.mp4'}))
  print(folder/'final-preview.mp4')

@@ -18,6 +18,8 @@ For the complete setup, install Python 3.12 if absent and run `bash setup-face-m
 
 ## 2. Configure the user's accounts
 
+For fal generation, follow [FAL-SETUP.md](FAL-SETUP.md): select `GENERATION_PROVIDER=fal` and use `FAL_KEY` instead of the Enhancor key. Replicate preparation credentials remain required. fal uses polling and does not require the callback tunnel. Existing Enhancor installations keep their default.
+
 Create `.env` from `.env.example` only if absent. Open it in the user's editor and ask them to enter their own Enhancor and Replicate keys there. Never request keys in chat, print values, copy credentials from another project, or commit `.env`.
 
 - Enhancor: https://app.enhancor.ai/api-dashboard

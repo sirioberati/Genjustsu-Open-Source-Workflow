@@ -4,7 +4,14 @@ from config import credential, setting
 from media_host import upload
 from audio_workflow import finish_preview
 
-def submit(folder,prompt,sirio,tein=None,status=print):
+def submit(folder,prompt,sirio,tein=None,status=print,provider=None):
+    if (Path(folder)/'fal-submission-attempt.json').exists():raise ValueError('fal submission already attempted. Resume it or check request history.')
+    from config import generation_provider
+    provider=provider or generation_provider()
+    if provider=='fal':
+        from fal_bridge import submit as fal_submit
+        return fal_submit(folder,prompt,sirio,tein,status)
+    if provider!='enhancor':raise ValueError('Unknown generation provider')
     folder=Path(folder)
     from mask_review import require_approved, is_mesh
     require_approved(folder)
@@ -48,6 +55,9 @@ def submit(folder,prompt,sirio,tein=None,status=print):
 
 def wait_and_finish(folder,request_id,status=print):
     folder=Path(folder)
+    if job_provider(folder)=='fal':
+        from fal_bridge import wait_and_finish as fal_wait
+        return fal_wait(folder,request_id,status)
     key=credential('ENHANCOR_API_KEY')
     for _ in range(360):
         r=requests.post(setting('ENHANCOR_BASE_URL','https://apireq.enhancor.ai/api/seedance2.5/v1').rstrip('/')+'/status',headers={'x-api-key':key},json={'request_id':request_id},timeout=30);r.raise_for_status();j=r.json()
@@ -67,6 +77,9 @@ def wait_and_finish(folder,request_id,status=print):
 def submit_hd(folder):
     """Complete the accepted draft; Enhancor reuses its original parameters."""
     folder=Path(folder)
+    if job_provider(folder)=='fal':
+        from fal_bridge import submit_hd as fal_hd
+        return fal_hd(folder)
     if (folder/'hd/response.json').exists():raise ValueError('HD already submitted. Resume its saved request.')
     generation=json.loads((folder/'generation.json').read_text())
     original=json.loads((folder/'seedance-request.json').read_text())
@@ -85,3 +98,13 @@ def submit_hd(folder):
     ident=data.get('requestId')
     if not ident:raise ValueError('Enhancor did not return a request ID.')
     return ident
+
+
+def job_provider(folder):
+    path=Path(folder)/'generation.json'
+    return json.loads(path.read_text()).get('provider','enhancor') if path.exists() else 'enhancor'
+
+
+def saved_request_id(folder, response_file):
+    data=json.loads((Path(folder)/response_file).read_text())
+    return data.get('request_id') if job_provider(folder)=='fal' else data.get('requestId')

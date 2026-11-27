@@ -18,14 +18,14 @@ class WorkflowTests(unittest.TestCase):
   with tempfile.TemporaryDirectory() as d:
    p=Path(d);(p/'seedance-response.json').write_text('{}')
    with patch('mask_review.require_approved'),patch('seedance_bridge.requests.post') as post:
-    with self.assertRaises(ValueError):seedance_bridge.submit(p,'prompt','reference.png')
+    with self.assertRaises(ValueError):seedance_bridge.submit(p,'prompt','reference.png',provider='enhancor')
     post.assert_not_called()
  def test_edit_draft_self_contained(self):
   with tempfile.TemporaryDirectory() as d:
    p=Path(d);(p/'audio-manifest.json').write_text('{}')
    response=Mock();response.json.return_value={'requestId':'fake-id'}
    with patch('mask_review.require_approved'),patch('seedance_bridge.credential',return_value='test'),patch('seedance_bridge.setting',return_value='https://example.org/callback'),patch('seedance_bridge.upload',return_value='https://example.org/media'),patch('audio_workflow.prepare_seedance_video',return_value=p/'seedance-input.mp4'),patch('seedance_bridge.requests.post',return_value=response) as post:
-    seedance_bridge.submit(p,'Replace one subject','reference.png')
+    seedance_bridge.submit(p,'Replace one subject','reference.png',provider='enhancor')
     payload=post.call_args.kwargs['json']
     self.assertTrue(payload['is_draft']);self.assertEqual(payload['mode'],'edit');self.assertEqual(payload['audios'],[]);self.assertEqual(len(payload['videos']),1)
     self.assertTrue((p/'generation.json').exists())
