@@ -169,3 +169,7 @@ The default `.env.example` uses `MEDIA_HOST=tmpfiles` and `MEDIA_HOST_FALLBACKS=
 The uploader checks direct URLs for HTTP errors, empty responses and HTML download pages. These checks cannot guarantee later provider access or codec compatibility. Tmpfiles references expire: for an explicitly authorized regeneration, upload fresh copies instead of reusing old request URLs. A failed upload never triggers a generation call.
 
 Paid generation requests are not automatically retried: on a timeout or unclear response, inspect the saved request/provider status first to avoid duplicate charges. On an explicit media-format failure, validate the local videos and re-upload before retrying. Polling remains the source of truth if callbacks are delayed. See [hosting details](docs/MEDIA-HOSTING.md).
+
+## Replacement timing and SAM memory
+
+Choose when replacement begins and use resumable short SAM chunks. See [replacement timing](docs/REPLACEMENT-TIMING.md).

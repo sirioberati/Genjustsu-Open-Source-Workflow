@@ -68,6 +68,8 @@ def finish_preview(generated,folder):
             for packet in stream.encode():out.mux(packet)
         (folder/'duration-adjustment.json').write_text(json.dumps({'method':'hold final frame','seconds':sd-vd,'original_audio':'unchanged'}))
         generated=padded
+    from replacement_scope import restore_prefix
+    generated=restore_prefix(generated,folder)
     # Copy original compressed audio packets, preserving the complete source mix.
     with av.open(str(generated)) as inp,av.open(str(folder/'upload.mp4')) as source_audio,av.open(str(target),'w') as out:
         if not source_audio.streams.audio:raise ValueError('Original source has no audio track.')

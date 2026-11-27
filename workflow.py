@@ -11,12 +11,15 @@ for command in ['status','repair-rgb','resume','hd','review','submit']:
  if command=='submit':c.add_argument('--prompt-file',required=True);c.add_argument('--reference',required=True);c.add_argument('--second-reference')
  if command=='resume':c.add_argument('--hd',action='store_true')
 sub.choices['prepare'].add_argument('--mode',choices=['depth','face_mesh','depth_mesh'],default='depth')
+sub.choices['prepare'].add_argument('--replacement-start',type=float,default=0)
 a=p.parse_args()
 if a.command=='prepare':
  import uuid,shutil
  from pipeline import run
  folder=ROOT/'runs'/uuid.uuid4().hex;folder.mkdir(parents=True)
  shutil.copy2(a.video,folder/'upload.mp4');print('JOB:',folder.name,flush=True)
+ from replacement_scope import configure
+ configure(folder,a.replacement_start)
  if a.mode=='face_mesh':
   from face_mesh import run as run_mesh
   run_mesh(folder/'upload.mp4',folder)
@@ -38,11 +41,12 @@ elif a.command=='repair-rgb':
  from mask_review import is_mesh
  mode=json.loads((folder/'workflow-mode.json').read_text()).get('mode') if (folder/'workflow-mode.json').exists() else 'depth'
  if mode=='face_mesh':p.error('Fast face mesh has no SAM mask. Reprepare facial tracking instead.')
- from raw_masks import segment_raw,clean_border_fragments
+ from raw_masks import segment_chunked,clean_border_fragments
  from pipeline import composite
  from audio_workflow import prepare_seedance_video
  meta=json.loads((folder/'manifest.json').read_text());repair=folder/'rgb-repair';repair.mkdir(exist_ok=True)
- masks=clean_border_fragments(segment_raw(folder/'original.mp4',repair,meta.get('prompt','person')))
+ from replacement_scope import start_time
+ masks=clean_border_fragments(segment_chunked(folder/'original.mp4',repair/'chunks',meta.get('prompt','person'),start_time(folder)))
  composite(folder/'original.mp4',folder/'depth.mp4',masks,folder,folder/'upload.mp4')
  if mode=='depth_mesh':
   import shutil,subprocess

@@ -78,6 +78,8 @@ def submit_hd(folder):
     # Keep the draft intact and use the exact source audio for the HD export.
     source=hd/'upload.mp4'
     if not source.exists():__import__('shutil').copy2(folder/'upload.mp4',source)
+    if (folder/'replacement-scope.json').exists():
+        __import__('shutil').copy2(folder/'replacement-scope.json',hd/'replacement-scope.json')
     (hd/'request.json').write_text(json.dumps(payload,indent=2))
     response=requests.post(setting('ENHANCOR_BASE_URL','https://apireq.enhancor.ai/api/seedance2.5/v1').rstrip('/')+'/queue',headers={'x-api-key':key},json=payload,timeout=90)
     response.raise_for_status();data=response.json()
